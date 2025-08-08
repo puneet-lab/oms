@@ -1,14 +1,19 @@
-FROM node:20
+FROM node:20-alpine
 WORKDIR /app
 
+# Copy package files
 COPY package*.json ./
-RUN npm ci
 
-# copy prisma so generate works in image builds too
+# Install only production dependencies, then dev deps, then clean up
+RUN npm ci --only=production && \
+    npm ci && \
+    npm cache clean --force
+
+# Copy prisma and generate
 COPY prisma ./prisma
 RUN npx prisma generate
 
-# copy src + tsconfig
+# Copy source files
 COPY tsconfig.json ./
 COPY src ./src
 

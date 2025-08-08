@@ -1,7 +1,7 @@
-node_modules
-npm-debug.log
-Dockerfile
-docker-compose.yml
-.git
-.gitignore
-README.md
+node_modules;
+npm - debug.log;
+Dockerfile;
+docker - compose.yml.gitignore.git.env;
+README.md;
+Makefile.prettierrc.prettierignore;
+eslint.config.mjs;
