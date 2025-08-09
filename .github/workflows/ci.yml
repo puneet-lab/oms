@@ -101,8 +101,8 @@ jobs:
       - name: Generate kubeconfig (fresh each run)
         run: aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "${{ secrets.AWS_REGION }}"
 
-      - run: kubectl version --short
-      - run: kubectl get nodes
+      - run: kubectl version --client
+      - run: kubectl get nodes -o wide
       - run: kubectl get ns "$K8S_NAMESPACE" || kubectl create ns "$K8S_NAMESPACE"
 
       - name: Apply k8s manifests (idempotent)
