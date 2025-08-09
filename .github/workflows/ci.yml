@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [main, dev] # ✅ run on main and dev
+    branches: [main] # ✅ run on main and dev
   pull_request:
     branches: [main] # optional: PRs into main
   workflow_dispatch: {}
