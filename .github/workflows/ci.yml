@@ -16,10 +16,10 @@ concurrency:
 
 env:
   # Set these in GitHub "Environments" (we keep using the 'dev' env for secrets/vars)
-  K8S_NAMESPACE: ${{ vars.K8S_NAMESPACE }} # e.g. "default"
-  DEPLOYMENT_NAME: ${{ vars.DEPLOYMENT_NAME }} # e.g. "app"
-  CONTAINER_NAME: ${{ vars.CONTAINER_NAME }} # e.g. "app"
-  EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}# e.g. "oms-cluster"
+  K8S_NAMESPACE: ${{ vars.K8S_NAMESPACE }}
+  DEPLOYMENT_NAME: ${{ vars.DEPLOYMENT_NAME }}
+  CONTAINER_NAME: ${{ vars.CONTAINER_NAME }}
+  EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
 
 jobs:
   test:
