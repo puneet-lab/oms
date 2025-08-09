@@ -3,18 +3,23 @@ info:
   title: OMS API
   version: 1.0.0
   description: |
-    Modular monolith API for Order Management.
-    Dev uses dummy bearer auth: `Authorization: Bearer dummy.<role>.<userId>`.
+    Versioned Order Management API with dev-friendly docs.
+    Use Swagger "Authorize" to test protected routes. Dev auth format:
+    `Authorization: Bearer dummy.<role>.<userId>` (roles: sales, admin)
+
 servers:
   - url: /api
     description: API namespace (most endpoints)
   - url: /
-    description: Root (health)
+    description: Root (also exposes /v1/* and /health)
+
 tags:
   - name: Meta
     description: Health & utility
   - name: Auth
     description: Authentication (dummy, dev-only)
+  - name: Warehouses
+    description: Inventory locations and stock levels
 
 components:
   securitySchemes:
@@ -26,16 +31,24 @@ components:
   headers:
     X-Request-Id:
       description: Correlates server logs with this response.
-      schema: { type: string }
+      schema:
+        type: string
     X-RateLimit-Limit:
       description: Max requests allowed in the current window.
-      schema: { type: integer, example: 100 }
+      schema:
+        type: integer
+        example: 100
     X-RateLimit-Remaining:
       description: Requests left in the current window.
-      schema: { type: integer, example: 97 }
+      schema:
+        type: integer
+        example: 97
     X-RateLimit-Reset:
       description: Unix epoch seconds when the window resets.
-      schema: { type: integer, format: int64, example: 1723199999 }
+      schema:
+        type: integer
+        format: int64
+        example: 1723199999
 
   schemas:
     ErrorResponse:
@@ -51,58 +64,136 @@ components:
             message:
               type: string
               example: Missing or invalid token
+
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: Invalid request
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                    example: 'limit'
+                  code:
+                    type: string
+                    example: 'invalid_type'
+                  message:
+                    type: string
+                    example: 'Expected number, received string'
+
     User:
       type: object
       required: [id, role]
       properties:
         id:
           type: string
-          example: 'dev-user-123'
+          example: dev-user-123
         role:
           type: string
           enum: [sales, admin]
           example: sales
 
+    Warehouse:
+      type: object
+      required: [id, name, lat, lng, stockUnits]
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: '2d5e7e32-bcdb-4a2f-8a5e-2b2a9b4d6c71'
+        name:
+          type: string
+          example: 'Los Angeles'
+        lat:
+          type: number
+          example: 33.9425
+        lng:
+          type: number
+          example: -118.408056
+        stockUnits:
+          type: integer
+          minimum: 0
+          example: 355
+
   responses:
+    UnprocessableEntity:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+
     Unauthorized:
       description: Unauthorized
       headers:
-        X-Request-Id: { $ref: '#/components/headers/X-Request-Id' }
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
           examples:
             unauthorized:
-              value: { error: { code: UNAUTHORIZED, message: 'Missing or invalid token' } }
+              value:
+                error:
+                  code: UNAUTHORIZED
+                  message: 'Missing or invalid token'
+
     Forbidden:
       description: Forbidden
       headers:
-        X-Request-Id: { $ref: '#/components/headers/X-Request-Id' }
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
           examples:
             forbidden:
-              value: { error: { code: FORBIDDEN, message: 'Insufficient role' } }
+              value:
+                error:
+                  code: FORBIDDEN
+                  message: 'Insufficient role'
+
     TooManyRequests:
       description: Rate limit exceeded
       headers:
-        X-RateLimit-Limit: { $ref: '#/components/headers/X-RateLimit-Limit' }
-        X-RateLimit-Remaining: { $ref: '#/components/headers/X-RateLimit-Remaining' }
-        X-RateLimit-Reset: { $ref: '#/components/headers/X-RateLimit-Reset' }
-        X-Request-Id: { $ref: '#/components/headers/X-Request-Id' }
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
           examples:
             limited:
-              value: { error: { code: RATE_LIMITED, message: 'Too many requests' } }
+              value:
+                error:
+                  code: RATE_LIMITED
+                  message: 'Too many requests'
 
 paths:
   /health:
     get:
       tags: [Meta]
       summary: Liveness probe
+      operationId: getHealth
       responses:
         '200':
           description: OK
@@ -111,76 +202,202 @@ paths:
               schema:
                 type: object
                 properties:
-                  ok: { type: boolean, example: true }
+                  ok:
+                    type: boolean
+                    example: true
 
   /v1/ping:
     get:
       tags: [Meta]
       summary: Quick sanity check
+      operationId: getPing
       responses:
         '200':
           description: Pong
           headers:
-            X-Request-Id: { $ref: '#/components/headers/X-Request-Id' }
-            X-RateLimit-Limit: { $ref: '#/components/headers/X-RateLimit-Limit' }
-            X-RateLimit-Remaining: { $ref: '#/components/headers/X-RateLimit-Remaining' }
-            X-RateLimit-Reset: { $ref: '#/components/headers/X-RateLimit-Reset' }
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  pong: { type: boolean, example: true }
+                  pong:
+                    type: boolean
+                    example: true
 
   /v1/auth:
     get:
       tags: [Auth]
       summary: Usage help for dummy auth
+      description: |
+        Click **Authorize** and paste an example like:
+        `Bearer dummy.sales.dev-user-123`
+      operationId: getAuthUsage
       responses:
         '200':
           description: Usage + roles
           headers:
-            X-Request-Id: { $ref: '#/components/headers/X-Request-Id' }
-            X-RateLimit-Limit: { $ref: '#/components/headers/X-RateLimit-Limit' }
-            X-RateLimit-Remaining: { $ref: '#/components/headers/X-RateLimit-Remaining' }
-            X-RateLimit-Reset: { $ref: '#/components/headers/X-RateLimit-Reset' }
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  usage: { type: string, example: 'Authorization: Bearer dummy.<role>.<userId>' }
+                  usage:
+                    type: string
+                    example: 'Authorization: Bearer dummy.<role>.<userId>'
                   roles:
                     type: array
-                    items: { type: string, enum: [sales, admin] }
+                    items:
+                      type: string
+                      enum: [sales, admin]
                     example: [sales, admin]
 
   /v1/auth/me:
     get:
       tags: [Auth]
       summary: Return current user (dummy)
+      description: |
+        **How to test:** Click **Authorize** → paste:
+        `Bearer dummy.sales.dev-user-123` (or `dummy.admin.corp-1`)
+      operationId: getAuthMe
       security:
         - bearerAuth: []
       responses:
         '200':
           description: Current user
           headers:
-            X-Request-Id: { $ref: '#/components/headers/X-Request-Id' }
-            X-RateLimit-Limit: { $ref: '#/components/headers/X-RateLimit-Limit' }
-            X-RateLimit-Remaining: { $ref: '#/components/headers/X-RateLimit-Remaining' }
-            X-RateLimit-Reset: { $ref: '#/components/headers/X-RateLimit-Reset' }
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  user: { $ref: '#/components/schemas/User' }
+                  user:
+                    $ref: '#/components/schemas/User'
               examples:
                 salesUser:
-                  value: { user: { id: 'dev-user-123', role: 'sales' } }
+                  value:
+                    user:
+                      id: 'dev-user-123'
+                      role: 'sales'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /v1/warehouses:
+    get:
+      tags: [Warehouses]
+      summary: List warehouses (read-only)
+      description: |
+        Returns the current stock per warehouse. Public endpoint (no auth).
+      operationId: listWarehouses
+      parameters:
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          example: 1
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+          example: 10
+      responses:
+        '200':
+          description: OK
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Warehouse'
+                  pagination:
+                    type: object
+                    properties:
+                      page:
+                        type: integer
+                        example: 1
+                      limit:
+                        type: integer
+                        example: 10
+                      total:
+                        type: integer
+                        example: 6
+                      totalPages:
+                        type: integer
+                        example: 1
+                      hasNext:
+                        type: boolean
+                        example: false
+                      hasPrevious:
+                        type: boolean
+                        example: false
+              examples:
+                sample:
+                  value:
+                    data:
+                      - id: 'f9b2a1c3-4d5e-6f7a-8b9c-0d1e2f3a4b5c'
+                        name: 'Los Angeles'
+                        lat: 33.9425
+                        lng: -118.408056
+                        stockUnits: 355
+                      - id: 'a1c3b2d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d'
+                        name: 'New York'
+                        lat: 40.639722
+                        lng: -73.778889
+                        stockUnits: 578
+                    pagination:
+                      page: 1
+                      limit: 10
+                      total: 6
+                      totalPages: 1
+                      hasNext: false
+                      hasPrevious: false
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         '429':
           $ref: '#/components/responses/TooManyRequests'

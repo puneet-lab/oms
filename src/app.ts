@@ -15,7 +15,6 @@ export function createApp() {
   app.use(requestId);
   app.use(authOptional);
   app.use('/api', routes);
-  app.use('/', routes);
   app.use(errorHandler);
   app.use(express.urlencoded({ extended: false }));
   app.use(corsMw);

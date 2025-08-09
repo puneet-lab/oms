@@ -7,7 +7,58 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Test {
-  id    Int     @id @default(autoincrement())
-  name  String
+model Warehouse {
+  id          String            @id @default(uuid())
+  name        String            @unique
+  lat         Float
+  lng         Float
+  stockUnits  Int               // current available units
+  allocations OrderAllocation[]
+
+  @@index([name])
+}
+
+model Order {
+  id               String            @id @default(uuid())
+  orderNumber      String            @unique        // e.g. "SC-2025-00001"
+  quantity         Int
+  // snapshot at submission time
+  unitPriceCents   Int               // 15000 per device (from brief)
+  discountPct      Int               // 0..100
+  discountCents    Int
+  shippingCents    Int
+  totalCents       Int
+  shipToLat        Float
+  shipToLng        Float
+  createdByUserId  String            // from dummy auth user.id
+  createdAt        DateTime          @default(now())
+
+  allocations      OrderAllocation[]
+}
+
+model OrderAllocation {
+  id           String    @id @default(uuid())
+  orderId      String
+  warehouseId  String
+  quantity     Int
+  distanceKm   Float
+  shippingCents Int
+
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+
+  @@unique([orderId, warehouseId])    // one row per warehouse per order
+  @@index([warehouseId])
+}
+
+model IdempotencyKey {
+  // We keep a single key per (method,path) to replay the same response
+  key       String   // client-provided value from "Idempotency-Key"
+  method    String
+  path      String
+  orderId   String?  @unique
+  createdAt DateTime @default(now())
+
+  @@id([key, method, path])           // composite PK is common for idempotency
+  @@index([createdAt])
 }
