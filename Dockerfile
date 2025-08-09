@@ -16,6 +16,7 @@ RUN npx prisma generate
 # Copy source files
 COPY tsconfig.json ./
 COPY src ./src
+COPY api-docs ./api-docs
 
 EXPOSE 3000
 CMD ["sh","-c","npx prisma generate && npm run dev"]
