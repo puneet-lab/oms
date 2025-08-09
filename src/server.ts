@@ -10,5 +10,5 @@ app.get('/test', async (_req, res) => {
 });
 
 app.listen(3000, () => {
-  console.log('🚀 Server running on trigger 1 http://localhost:3000');
+  console.log('🚀 Server running on test final http://localhost:3000');
 });
