@@ -1,14 +1,4 @@
-import express from 'express';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
-const app = express();
-
-app.get('/test', async (_req, res) => {
-  const data = await prisma.test.findMany();
-  res.json(data);
-});
-
-app.listen(3000, () => {
-  console.log('🚀 Server running on test final http://localhost:3000');
-});
+import { createApp } from './app';
+const app = createApp();
+const port = process.env.PORT ?? 3000;
+app.listen(port, () => console.log(`API up on :${port}`));

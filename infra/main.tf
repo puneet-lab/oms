@@ -29,6 +29,7 @@ data "aws_subnets" "default" {
 # Create ECR repo
 resource "aws_ecr_repository" "app" {
   name = var.ecr_repo_name
+  force_delete = true
 }
 
 # EKS Cluster IAM Role
