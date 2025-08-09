@@ -5,6 +5,7 @@ import { errorHandler } from './app/middlewares/error-handler';
 import { authOptional } from './app/middlewares/auth';
 import { corsMw } from './app/middlewares/cors';
 import { rateLimitMw } from './app/middlewares/rate-limit';
+import { mountSwagger } from './app/swagger';
 
 export function createApp() {
   const app = express();
@@ -18,6 +19,7 @@ export function createApp() {
   app.use(express.urlencoded({ extended: false }));
   app.use(corsMw);
   app.use(rateLimitMw);
+  mountSwagger(app);
 
   // Public health endpoint
   app.get('/health', (_req, res) => res.json({ ok: true }));
