@@ -2,10 +2,10 @@ name: ci
 
 on:
   push:
-    branches: [main] # ⬅️ only main
+    branches: [main, dev] # ✅ run on main and dev
   pull_request:
-    branches: [main] # optional: run tests on PRs into main
-  workflow_dispatch: {} # manual run button
+    branches: [main] # optional: PRs into main
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -15,9 +15,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # Set these in GitHub "Environments" (we keep using the 'dev' env for secrets/vars)
   K8S_NAMESPACE: ${{ vars.K8S_NAMESPACE }} # e.g. "default"
   DEPLOYMENT_NAME: ${{ vars.DEPLOYMENT_NAME }} # e.g. "app"
   CONTAINER_NAME: ${{ vars.CONTAINER_NAME }} # e.g. "app"
+  EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}# e.g. "oms-cluster"
 
 jobs:
   test:
@@ -32,12 +34,14 @@ jobs:
       - run: npm ci
       - run: npm run lint --if-present
       - run: npm test
+        env:
+          CI: true
 
   build_and_push:
-    name: Build & Push (main)
+    name: Build & Push (main/dev)
     needs: test
     runs-on: ubuntu-latest
-    environment: dev # reusing same env/secrets as before
+    environment: dev # reusing same environment/secrets
     steps:
       - uses: actions/checkout@v4
 
@@ -48,8 +52,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Compute ECR registry
-        run: echo "ECR_REGISTRY=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com" >> $GITHUB_ENV
+      - name: Compute registry & tag prefix
+        run: |
+          echo "ECR_REGISTRY=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com" >> $GITHUB_ENV
+          if [ "${{ github.ref_name }}" = "main" ]; then echo "TAG_PREFIX=prod" >> $GITHUB_ENV; else echo "TAG_PREFIX=dev" >> $GITHUB_ENV; fi
 
       - uses: aws-actions/amazon-ecr-login@v2
       - uses: docker/setup-buildx-action@v3
@@ -58,40 +64,54 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64
+          platforms: linux/amd64 # add ,linux/arm64 if your nodes are Graviton
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/${{ secrets.ECR_REPO }}:prod-${{ github.sha }}
-            ${{ env.ECR_REGISTRY }}/${{ secrets.ECR_REPO }}:prod-latest
+            ${{ env.ECR_REGISTRY }}/${{ secrets.ECR_REPO }}:${{ env.TAG_PREFIX }}-${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/${{ secrets.ECR_REPO }}:${{ env.TAG_PREFIX }}-latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   deploy:
-    name: Deploy to EKS (main)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' # ⬅️ deploy only on push to main
+    name: Deploy to EKS (main/dev)
+    if: github.event_name == 'push' # only deploy on direct pushes (not PRs)
     needs: build_and_push
     runs-on: ubuntu-latest
-    environment: dev # reusing the same environment
+    environment: dev # reusing the same env for secrets/vars
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v4
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          version: 'v1.29.0'
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Write kubeconfig from secret
+      # Ensure AWS CLI is available (runner usually has it; this keeps us safe)
+      - name: Ensure AWS CLI present
         run: |
-          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > $HOME/kubeconfig
-          echo "KUBECONFIG=$HOME/kubeconfig" >> $GITHUB_ENV
+          aws --version || (curl -sS "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip \
+            && unzip -q awscliv2.zip && sudo ./aws/install && aws --version)
+
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: v1.29.0
+
+      - name: Generate kubeconfig (fresh each run)
+        run: aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "${{ secrets.AWS_REGION }}"
+
+      - run: kubectl version --short
+      - run: kubectl get nodes
+      - run: kubectl get ns "$K8S_NAMESPACE" || kubectl create ns "$K8S_NAMESPACE"
 
       - name: Apply k8s manifests (idempotent)
         run: kubectl -n "$K8S_NAMESPACE" apply -f infra/k8s/
 
       - name: Set image on deployment
         env:
-          IMAGE: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO }}:prod-${{ github.sha }}
+          IMAGE: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO }}:${{ github.ref_name == 'main' && 'prod' || 'dev' }}-${{ github.sha }}
         run: kubectl -n "$K8S_NAMESPACE" set image deployment/"$DEPLOYMENT_NAME" "$CONTAINER_NAME"="$IMAGE"
 
       - name: Wait for rollout
-        run: kubectl -n "$K8S_NAMESPACE" rollout status deployment/"$DEPLOYMENT_NAME" --timeout=180s
+        run: kubectl -n "$K8S_NAMESPACE" rollout status deployment/"$DEPLOYMENT_NAME" --timeout=300s
