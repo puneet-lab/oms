@@ -1,11 +1,11 @@
-name: ci-dev
+name: ci
 
 on:
   push:
-    branches: [dev]
+    branches: [main] # ⬅️ only main
   pull_request:
-    branches: [dev]
-  workflow_dispatch: {}
+    branches: [main] # optional: run tests on PRs into main
+  workflow_dispatch: {} # manual run button
 
 permissions:
   contents: read
@@ -15,7 +15,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Non-sensitive values stored as Environment → dev → Variables
   K8S_NAMESPACE: ${{ vars.K8S_NAMESPACE }} # e.g. "default"
   DEPLOYMENT_NAME: ${{ vars.DEPLOYMENT_NAME }} # e.g. "app"
   CONTAINER_NAME: ${{ vars.CONTAINER_NAME }} # e.g. "app"
@@ -26,25 +25,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-
       - run: npm ci
       - run: npm run lint --if-present
       - run: npm test --if-present -- --ci
 
   build_and_push:
-    name: Build & Push (dev)
+    name: Build & Push (main)
     needs: test
     runs-on: ubuntu-latest
-    environment: dev
+    environment: dev # reusing same env/secrets as before
     steps:
       - uses: actions/checkout@v4
 
-      # Static keys for PoC
       - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -65,18 +61,17 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/${{ secrets.ECR_REPO }}:dev-${{ github.sha }}
-            ${{ env.ECR_REGISTRY }}/${{ secrets.ECR_REPO }}:dev-latest
+            ${{ env.ECR_REGISTRY }}/${{ secrets.ECR_REPO }}:prod-${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/${{ secrets.ECR_REPO }}:prod-latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   deploy:
-    name: Deploy to EKS (dev)
-    # Only deploy on direct pushes to dev, not on PRs
-    if: github.event_name == 'push'
+    name: Deploy to EKS (main)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' # ⬅️ deploy only on push to main
     needs: build_and_push
     runs-on: ubuntu-latest
-    environment: dev
+    environment: dev # reusing the same environment
     steps:
       - uses: actions/checkout@v4
 
@@ -91,16 +86,12 @@ jobs:
           echo "KUBECONFIG=$HOME/kubeconfig" >> $GITHUB_ENV
 
       - name: Apply k8s manifests (idempotent)
-        run: |
-          # Apply the whole folder so Service/Deployment/HPA/Secret are created/updated
-          kubectl -n "$K8S_NAMESPACE" apply -f infra/k8s/
+        run: kubectl -n "$K8S_NAMESPACE" apply -f infra/k8s/
 
       - name: Set image on deployment
         env:
-          IMAGE: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO }}:dev-${{ github.sha }}
-        run: |
-          kubectl -n "$K8S_NAMESPACE" set image deployment/"$DEPLOYMENT_NAME" "$CONTAINER_NAME"="$IMAGE"
+          IMAGE: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO }}:prod-${{ github.sha }}
+        run: kubectl -n "$K8S_NAMESPACE" set image deployment/"$DEPLOYMENT_NAME" "$CONTAINER_NAME"="$IMAGE"
 
       - name: Wait for rollout
-        run: |
-          kubectl -n "$K8S_NAMESPACE" rollout status deployment/"$DEPLOYMENT_NAME" --timeout=180s
+        run: kubectl -n "$K8S_NAMESPACE" rollout status deployment/"$DEPLOYMENT_NAME" --timeout=180s
