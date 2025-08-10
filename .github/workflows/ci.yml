@@ -15,17 +15,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # K8s / deploy targets (configure these as Environment "dev" vars/secrets)
   K8S_NAMESPACE: ${{ vars.K8S_NAMESPACE }}
   DEPLOYMENT_NAME: ${{ vars.DEPLOYMENT_NAME }}
   CONTAINER_NAME: ${{ vars.CONTAINER_NAME }}
   EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
   AWS_REGION: ${{ secrets.AWS_REGION }}
-
-  # Test database (configure as Environment "dev" vars)
-  TEST_POSTGRES_USER: ${{ vars.TEST_POSTGRES_USER }}
-  TEST_POSTGRES_PASSWORD: ${{ vars.TEST_POSTGRES_PASSWORD }}
-  TEST_POSTGRES_DB: ${{ vars.TEST_POSTGRES_DB }}
 
 jobs:
   test:
@@ -36,13 +30,10 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: ${{ env.TEST_POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ env.TEST_POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ env.TEST_POSTGRES_DB }}
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd="pg_isready -U ${{ env.TEST_POSTGRES_USER }} -d ${{ env.TEST_POSTGRES_DB }}"
-          --health-interval=5s --health-timeout=5s --health-retries=20
+          POSTGRES_USER: ${{ vars.TEST_POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ vars.TEST_POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ vars.TEST_POSTGRES_DB }}
+        ports: ['5432:5432'] # no health-cmd; tests retry via global setup
     steps:
       - uses: actions/checkout@v4
 
@@ -51,16 +42,14 @@ jobs:
           node-version: 20
           cache: npm
 
-      # Compose TEST_DATABASE_URL and mirror to DATABASE_URL for Prisma/app
       - name: Compose test DB URL
         run: |
-          echo "TEST_DATABASE_URL=postgres://${{ env.TEST_POSTGRES_USER }}:${{ env.TEST_POSTGRES_PASSWORD }}@localhost:5432/${{ env.TEST_POSTGRES_DB }}" >> $GITHUB_ENV
+          echo "TEST_DATABASE_URL=postgresql://${{ vars.TEST_POSTGRES_USER }}:${{ vars.TEST_POSTGRES_PASSWORD }}@localhost:5432/${{ vars.TEST_POSTGRES_DB }}" >> $GITHUB_ENV
           echo "DATABASE_URL=${TEST_DATABASE_URL}" >> $GITHUB_ENV
 
       - run: npm ci
       - run: npx prisma generate
 
-      # Your Vitest global setup will prisma db push into an ephemeral schema
       - name: Run tests
         run: npm test
         env:
