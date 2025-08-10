@@ -20,6 +20,10 @@ env:
   DEPLOYMENT_NAME: ${{ vars.DEPLOYMENT_NAME }}
   CONTAINER_NAME: ${{ vars.CONTAINER_NAME }}
   EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+  # Test database configuration (non-sensitive values for CI)
+  TEST_POSTGRES_USER: ${{ vars.TEST_POSTGRES_USER }}
+  TEST_POSTGRES_PASSWORD: ${{ vars.TEST_POSTGRES_PASSWORD }}
+  TEST_POSTGRES_DB: ${{ vars.TEST_POSTGRES_DB }}
 
 jobs:
   test:
@@ -29,12 +33,12 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.TEST_POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.TEST_POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.TEST_POSTGRES_DB }}
         ports: ['5432:5432']
         options: >-
-          --health-cmd="pg_isready -U ${{ secrets.POSTGRES_USER }} -d ${{ secrets.POSTGRES_DB }}"
+          --health-cmd="pg_isready -U ${{ env.TEST_POSTGRES_USER }} -d ${{ env.TEST_POSTGRES_DB }}"
           --health-interval=5s --health-timeout=5s --health-retries=20
     steps:
       - uses: actions/checkout@v4
@@ -46,7 +50,8 @@ jobs:
         env:
           CI: true
           NODE_ENV: test
-          DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+          # Construct the test database URL using the same values as the service
+          DATABASE_URL: postgresql://${{ env.TEST_POSTGRES_USER }}:${{ env.TEST_POSTGRES_PASSWORD }}@localhost:5432/${{ env.TEST_POSTGRES_DB }}
 
   build_and_push:
     name: Build & Push (main/dev)
