@@ -20,6 +20,8 @@ tags:
     description: Authentication (dummy, dev-only)
   - name: Warehouses
     description: Inventory locations and stock levels
+  - name: Orders
+    description: Order quoting and management
   - name: Admin
     description: Admin-only endpoints
   - name: Pricing
@@ -53,6 +55,11 @@ components:
         type: integer
         format: int64
         example: 1723199999
+    X-Rule-Set-Id:
+      description: Pricing ruleset used to compute the quote.
+      schema:
+        type: string
+        format: uuid
 
   schemas:
     ErrorResponse:
@@ -177,6 +184,106 @@ components:
           type: integer
           minimum: 0
           example: 0
+
+    CreateQuoteRequest:
+      type: object
+      required: [quantity, shipTo]
+      properties:
+        quantity:
+          type: integer
+          minimum: 1
+          example: 42
+        shipTo:
+          type: object
+          required: [lat, lng]
+          properties:
+            lat:
+              type: number
+              example: 40.71
+            lng:
+              type: number
+              example: -74.0
+
+    AllocationItem:
+      type: object
+      required: [warehouseId, name, quantity, distanceKm, shippingCents]
+      properties:
+        warehouseId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        distanceKm:
+          type: number
+          example: 3942.6
+        shippingCents:
+          type: integer
+          minimum: 0
+
+    QuoteResponse:
+      type: object
+      required: [ruleSetId, input, totals, allocation]
+      properties:
+        ruleSetId:
+          type: string
+          format: uuid
+        input:
+          $ref: '#/components/schemas/CreateQuoteRequest'
+        totals:
+          type: object
+          required:
+            [
+              unitPriceCents,
+              subtotalCents,
+              discountPct,
+              discountCents,
+              shippingCents,
+              totalCents,
+              shippingRatio,
+              valid,
+            ]
+          properties:
+            unitPriceCents:
+              type: integer
+              example: 15000
+            subtotalCents:
+              type: integer
+              example: 630000
+            discountPct:
+              type: integer
+              example: 10
+            discountCents:
+              type: integer
+              example: 63000
+            shippingCents:
+              type: integer
+              example: 12345
+            totalCents:
+              type: integer
+              example: 579345
+            shippingRatio:
+              type: number
+              example: 0.0213
+            valid:
+              type: boolean
+              example: true
+            reason:
+              type: string
+              enum: [INSUFFICIENT_STOCK, SHIPPING_EXCEEDS_15_PERCENT]
+        allocation:
+          type: object
+          required: [items, unallocated]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/AllocationItem'
+            unallocated:
+              type: integer
+              example: 0
 
   responses:
     UnprocessableEntity:
@@ -465,6 +572,52 @@ paths:
                       totalPages: 1
                       hasNext: false
                       hasPrevious: false
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /v1/orders/quotes:
+    post:
+      tags: [Orders]
+      summary: Price & allocate an order (no inventory change)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQuoteRequest'
+            examples:
+              sample:
+                value:
+                  quantity: 42
+                  shipTo:
+                    lat: 40.71
+                    lng: -74.0
+      responses:
+        '200':
+          description: Quote computed
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+            X-Rule-Set-Id:
+              $ref: '#/components/headers/X-Rule-Set-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuoteResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '429':
