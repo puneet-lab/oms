@@ -20,6 +20,10 @@ tags:
     description: Authentication (dummy, dev-only)
   - name: Warehouses
     description: Inventory locations and stock levels
+  - name: Admin
+    description: Admin-only endpoints
+  - name: Pricing
+    description: Pricing rule management
 
 components:
   securitySchemes:
@@ -126,6 +130,54 @@ components:
           minimum: 0
           example: 355
 
+    CreateRuleSet:
+      type: object
+      required:
+        [name, effectiveFrom, unitPriceCents, unitWeightKg, shipRatePerKgKm, shippingMaxRatio]
+      properties:
+        name:
+          type: string
+          example: 'Q4-2025'
+        effectiveFrom:
+          type: string
+          format: date-time
+          example: '2025-08-10T00:00:00Z'
+        unitPriceCents:
+          type: integer
+          minimum: 0
+          example: 15000
+        unitWeightKg:
+          type: number
+          exclusiveMinimum: 0
+          example: 0.365
+        shipRatePerKgKm:
+          type: number
+          minimum: 0
+          example: 0.01
+        shippingMaxRatio:
+          type: number
+          minimum: 0
+          maximum: 1
+          example: 0.15
+
+    DiscountTier:
+      type: object
+      required: [threshold, pct]
+      properties:
+        threshold:
+          type: integer
+          minimum: 1
+          example: 25
+        pct:
+          type: integer
+          minimum: 0
+          maximum: 100
+          example: 5
+        priority:
+          type: integer
+          minimum: 0
+          example: 0
+
   responses:
     UnprocessableEntity:
       description: Request validation failed
@@ -187,6 +239,22 @@ components:
                 error:
                   code: RATE_LIMITED
                   message: 'Too many requests'
+
+    NotFound:
+      description: Resource not found
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            notFound:
+              value:
+                error:
+                  code: NOT_FOUND
+                  message: 'Resource not found'
 
 paths:
   /health:
@@ -397,6 +465,128 @@ paths:
                       totalPages: 1
                       hasNext: false
                       hasPrevious: false
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /v1/admin/pricing/rulesets:
+    post:
+      tags: [Admin, Pricing]
+      summary: Create pricing rule set
+      description: |
+        Create a rule set with effective date. If effective now, future verifications use it immediately.
+      operationId: createPricingRuleSet
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRuleSet'
+            examples:
+              now:
+                value:
+                  name: 'Q4-2025'
+                  effectiveFrom: '2025-08-10T00:00:00Z'
+                  unitPriceCents: 15000
+                  unitWeightKg: 0.365
+                  shipRatePerKgKm: 0.01
+                  shippingMaxRatio: 0.15
+      responses:
+        '201':
+          description: Created
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+                  effectiveFrom:
+                    type: string
+                    format: date-time
+                    example: '2025-08-10T00:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /v1/admin/pricing/rulesets/{id}/tiers:
+    put:
+      tags: [Admin, Pricing]
+      summary: Replace discount tiers for a rule set
+      description: |
+        Replace all discount tiers for the specified rule set with the provided tiers.
+      operationId: replacePricingTiers
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tiers]
+              properties:
+                tiers:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/DiscountTier'
+            examples:
+              basic:
+                value:
+                  tiers:
+                    - threshold: 25
+                      pct: 5
+                    - threshold: 50
+                      pct: 10
+                    - threshold: 100
+                      pct: 15
+                    - threshold: 250
+                      pct: 20
+      responses:
+        '200':
+          description: Replaced
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ruleSetId:
+                    type: string
+                    format: uuid
+                    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+                  tiers:
+                    type: integer
+                    example: 4
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '429':

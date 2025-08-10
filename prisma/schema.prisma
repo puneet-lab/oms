@@ -62,3 +62,32 @@ model IdempotencyKey {
   @@id([key, method, path])           // composite PK is common for idempotency
   @@index([createdAt])
 }
+
+model PricingRuleSet {
+  id               String   @id @default(uuid())
+  name             String
+  effectiveFrom    DateTime
+  unitPriceCents   Int
+  unitWeightKg     Float
+  shipRatePerKgKm  Float
+  shippingMaxRatio Float
+  createdByUserId  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  tiers            DiscountTier[]
+
+  @@index([effectiveFrom])
+}
+
+model DiscountTier {
+  id        String @id @default(uuid())
+  ruleSetId String
+  threshold Int
+  pct       Int
+  priority  Int     // higher first
+  ruleSet   PricingRuleSet @relation(fields: [ruleSetId], references: [id], onDelete: Cascade)
+
+  @@index([ruleSetId])
+  @@unique([ruleSetId, threshold])
+}
+
