@@ -15,20 +15,23 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Set these in GitHub "Environments" (we keep using the 'dev' env for secrets/vars)
+  # K8s / deploy targets (configure these as Environment "dev" vars/secrets)
   K8S_NAMESPACE: ${{ vars.K8S_NAMESPACE }}
   DEPLOYMENT_NAME: ${{ vars.DEPLOYMENT_NAME }}
   CONTAINER_NAME: ${{ vars.CONTAINER_NAME }}
   EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
-  # Test database configuration (non-sensitive values for CI)
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+
+  # Test database (configure as Environment "dev" vars)
   TEST_POSTGRES_USER: ${{ vars.TEST_POSTGRES_USER }}
   TEST_POSTGRES_PASSWORD: ${{ vars.TEST_POSTGRES_PASSWORD }}
   TEST_POSTGRES_DB: ${{ vars.TEST_POSTGRES_DB }}
 
 jobs:
   test:
+    name: Lint & Test
     runs-on: ubuntu-latest
-    environment: dev # Add this to access your dev environment secrets
+    environment: dev
     services:
       postgres:
         image: postgres:16-alpine
@@ -42,22 +45,36 @@ jobs:
           --health-interval=5s --health-timeout=5s --health-retries=20
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: npm }
+        with:
+          node-version: 20
+          cache: npm
+
+      # Compose TEST_DATABASE_URL and mirror to DATABASE_URL for Prisma/app
+      - name: Compose test DB URL
+        run: |
+          echo "TEST_DATABASE_URL=postgres://${{ env.TEST_POSTGRES_USER }}:${{ env.TEST_POSTGRES_PASSWORD }}@localhost:5432/${{ env.TEST_POSTGRES_DB }}" >> $GITHUB_ENV
+          echo "DATABASE_URL=${TEST_DATABASE_URL}" >> $GITHUB_ENV
+
       - run: npm ci
       - run: npx prisma generate
-      - run: npm test
+
+      # Your Vitest global setup will prisma db push into an ephemeral schema
+      - name: Run tests
+        run: npm test
         env:
           CI: true
           NODE_ENV: test
-          # Construct the test database URL using the same values as the service
-          DATABASE_URL: postgresql://${{ env.TEST_POSTGRES_USER }}:${{ env.TEST_POSTGRES_PASSWORD }}@localhost:5432/${{ env.TEST_POSTGRES_DB }}
+
+      - name: Lint (optional)
+        run: npm run lint --if-present
 
   build_and_push:
     name: Build & Push (main/dev)
     needs: test
     runs-on: ubuntu-latest
-    environment: dev # reusing same environment/secrets
+    environment: dev
     steps:
       - uses: actions/checkout@v4
 
@@ -66,11 +83,11 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Compute registry & tag prefix
         run: |
-          echo "ECR_REGISTRY=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com" >> $GITHUB_ENV
+          echo "ECR_REGISTRY=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com" >> $GITHUB_ENV
           if [ "${{ github.ref_name }}" = "main" ]; then echo "TAG_PREFIX=prod" >> $GITHUB_ENV; else echo "TAG_PREFIX=dev" >> $GITHUB_ENV; fi
 
       - uses: aws-actions/amazon-ecr-login@v2
@@ -80,7 +97,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64 # add ,linux/arm64 if your nodes are Graviton
+          platforms: linux/amd64
           push: true
           tags: |
             ${{ env.ECR_REGISTRY }}/${{ secrets.ECR_REPO }}:${{ env.TAG_PREFIX }}-${{ github.sha }}
@@ -90,10 +107,10 @@ jobs:
 
   deploy:
     name: Deploy to EKS (main/dev)
-    if: github.event_name == 'push' # only deploy on direct pushes (not PRs)
+    if: github.event_name == 'push'
     needs: build_and_push
     runs-on: ubuntu-latest
-    environment: dev # reusing the same env for secrets/vars
+    environment: dev
     steps:
       - uses: actions/checkout@v4
 
@@ -102,32 +119,24 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      # Ensure AWS CLI is available (runner usually has it; this keeps us safe)
-      - name: Ensure AWS CLI present
-        run: |
-          aws --version || (curl -sS "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip \
-            && unzip -q awscliv2.zip && sudo ./aws/install && aws --version)
+          aws-region: ${{ env.AWS_REGION }}
 
       - uses: azure/setup-kubectl@v4
         with:
           version: v1.29.0
 
-      - name: Generate kubeconfig (fresh each run)
-        run: aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "${{ secrets.AWS_REGION }}"
+      - name: Generate kubeconfig
+        run: aws eks update-kubeconfig --name "${{ env.EKS_CLUSTER_NAME }}" --region "${{ env.AWS_REGION }}"
 
       - run: kubectl version --client
-      - run: kubectl get nodes -o wide
-      - run: kubectl get ns "$K8S_NAMESPACE" || kubectl create ns "$K8S_NAMESPACE"
-
-      - name: Apply k8s manifests (idempotent)
-        run: kubectl -n "$K8S_NAMESPACE" apply -f infra/k8s/
+      - run: kubectl get ns "${{ env.K8S_NAMESPACE }}" || kubectl create ns "${{ env.K8S_NAMESPACE }}"
+      - name: Apply k8s manifests
+        run: kubectl -n "${{ env.K8S_NAMESPACE }}" apply -f infra/k8s/
 
       - name: Set image on deployment
         env:
-          IMAGE: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO }}:${{ github.ref_name == 'main' && 'prod' || 'dev' }}-${{ github.sha }}
-        run: kubectl -n "$K8S_NAMESPACE" set image deployment/"$DEPLOYMENT_NAME" "$CONTAINER_NAME"="$IMAGE"
+          IMAGE: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO }}:${{ github.ref_name == 'main' && 'prod' || 'dev' }}-${{ github.sha }}
+        run: kubectl -n "${{ env.K8S_NAMESPACE }}" set image deployment/"${{ env.DEPLOYMENT_NAME }}" "${{ env.CONTAINER_NAME }}"="$IMAGE"
 
       - name: Wait for rollout
-        run: kubectl -n "$K8S_NAMESPACE" rollout status deployment/"$DEPLOYMENT_NAME" --timeout=300s
+        run: kubectl -n "${{ env.K8S_NAMESPACE }}" rollout status deployment/"${{ env.DEPLOYMENT_NAME }}" --timeout=300s
