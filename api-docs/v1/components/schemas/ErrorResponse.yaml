@@ -1,0 +1,8 @@
+type: object
+properties:
+  error:
+    type: object
+    required: [code, message]
+    properties:
+      code: { type: string, example: UNAUTHORIZED }
+      message: { type: string, example: Missing or invalid token }

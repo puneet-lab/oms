@@ -1,0 +1,2 @@
+description: Unix epoch seconds when the window resets.
+schema: { type: integer, format: int64, example: 1723199999 }

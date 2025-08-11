@@ -1,0 +1,9 @@
+type: object
+required: [name, effectiveFrom, unitPriceCents, unitWeightKg, shipRatePerKgKm, shippingMaxRatio]
+properties:
+  name:              { type: string,  example: 'Q4-2025' }
+  effectiveFrom:     { type: string,  format: date-time, example: '2025-08-10T00:00:00Z' }
+  unitPriceCents:    { type: integer, minimum: 0, example: 15000 }
+  unitWeightKg:      { type: number,  exclusiveMinimum: true, example: 0.365 }
+  shipRatePerKgKm:   { type: number,  minimum: 0, example: 0.01 }
+  shippingMaxRatio:  { type: number,  minimum: 0, maximum: 1, example: 0.15 }

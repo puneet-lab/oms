@@ -1,0 +1,5 @@
+type: object
+required: [id, role]
+properties:
+  id:   { type: string, example: dev-user-123 }
+  role: { type: string, enum: [sales, admin], example: sales }

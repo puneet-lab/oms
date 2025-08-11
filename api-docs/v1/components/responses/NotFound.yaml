@@ -1,0 +1,9 @@
+description: Resource not found
+headers:
+  X-Request-Id: { $ref: '#/components/headers/X-Request-Id' }
+content:
+  application/json:
+    schema: { $ref: '#/components/schemas/ErrorResponse' }
+    examples:
+      notFound:
+        value: { error: { code: NOT_FOUND, message: 'Resource not found' } }

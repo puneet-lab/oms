@@ -1,0 +1,8 @@
+type: object
+required: [id, name, lat, lng, stockUnits]
+properties:
+  id:   { type: string, format: uuid, example: '2d5e7e32-bcdb-4a2f-8a5e-2b2a9b4d6c71' }
+  name: { type: string, example: 'Los Angeles' }
+  lat:  { type: number, example: 33.9425 }
+  lng:  { type: number, example: -118.408056 }
+  stockUnits: { type: integer, minimum: 0, example: 355 }

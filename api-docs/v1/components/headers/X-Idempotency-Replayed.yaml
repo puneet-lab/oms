@@ -1,0 +1,4 @@
+description: Present on replayed requests.
+schema:
+  type: string
+  enum: ['true']

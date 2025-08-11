@@ -1,0 +1,2 @@
+description: Prevents duplicate order creation; required.
+schema: { type: string }

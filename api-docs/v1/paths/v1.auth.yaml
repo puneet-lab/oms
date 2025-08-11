@@ -1,0 +1,25 @@
+get:
+  tags: [Auth]
+  summary: Usage help for dummy auth
+  description: |
+    Click **Authorize** and paste an example like:
+    `Bearer dummy.sales.dev-user-123`
+  operationId: getAuthUsage
+  responses:
+    '200':
+      description: Usage + roles
+      headers:
+        X-Request-Id:         { $ref: '#/components/headers/X-Request-Id' }
+        X-RateLimit-Limit:    { $ref: '#/components/headers/X-RateLimit-Limit' }
+        X-RateLimit-Remaining:{ $ref: '#/components/headers/X-RateLimit-Remaining' }
+        X-RateLimit-Reset:    { $ref: '#/components/headers/X-RateLimit-Reset' }
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              usage: { type: string, example: 'Authorization: Bearer dummy.<role>.<userId>' }
+              roles:
+                type: array
+                items: { type: string, enum: [sales, admin] }
+                example: [sales, admin]

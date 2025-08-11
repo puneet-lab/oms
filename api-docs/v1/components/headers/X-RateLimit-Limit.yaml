@@ -1,0 +1,2 @@
+description: Max requests allowed in the current window.
+schema: { type: integer, example: 100 }

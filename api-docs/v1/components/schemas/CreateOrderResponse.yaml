@@ -1,0 +1,30 @@
+type: object
+required: [orderId, ruleSetId, totals, allocation]
+properties:
+  orderId:   { type: string, format: uuid }
+  ruleSetId: { type: string, format: uuid }
+  totals:
+    type: object
+    required: [unitPriceCents, subtotalCents, discountPct, discountCents, shippingCents, totalCents]
+    properties:
+      unitPriceCents: { type: integer, example: 15000 }
+      subtotalCents:  { type: integer, example: 150000 }
+      discountPct:    { type: integer, example: 10 }
+      discountCents:  { type: integer, example: 15000 }
+      shippingCents:  { type: integer, example: 12345 }
+      totalCents:     { type: integer, example: 147345 }
+  allocation:
+    type: object
+    required: [items]
+    properties:
+      items:
+        type: array
+        items:
+          type: object
+          required: [warehouseId, name, quantity, distanceKm, shippingCents]
+          properties:
+            warehouseId:  { type: string, format: uuid }
+            name:         { type: string }
+            quantity:     { type: integer }
+            distanceKm:   { type: number }
+            shippingCents:{ type: integer }

@@ -1,0 +1,12 @@
+description: Rate limit exceeded
+headers:
+  X-RateLimit-Limit:     { $ref: '#/components/headers/X-RateLimit-Limit' }
+  X-RateLimit-Remaining: { $ref: '#/components/headers/X-RateLimit-Remaining' }
+  X-RateLimit-Reset:     { $ref: '#/components/headers/X-RateLimit-Reset' }
+  X-Request-Id:          { $ref: '#/components/headers/X-Request-Id' }
+content:
+  application/json:
+    schema: { $ref: '#/components/schemas/ErrorResponse' }
+    examples:
+      limited:
+        value: { error: { code: RATE_LIMITED, message: 'Too many requests' } }

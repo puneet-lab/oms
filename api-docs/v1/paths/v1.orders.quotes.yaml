@@ -1,0 +1,30 @@
+post:
+  tags: [Orders]
+  summary: Price & allocate an order (no inventory change)
+  security: [ { bearerAuth: [] } ]
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema: { $ref: '#/components/schemas/CreateQuoteRequest' }
+        examples:
+          sample:
+            value:
+              quantity: 42
+              shipTo: { lat: 40.71, lng: -74.0 }
+  responses:
+    '200':
+      description: Quote computed
+      headers:
+        X-Request-Id:         { $ref: '#/components/headers/X-Request-Id' }
+        X-RateLimit-Limit:    { $ref: '#/components/headers/X-RateLimit-Limit' }
+        X-RateLimit-Remaining:{ $ref: '#/components/headers/X-RateLimit-Remaining' }
+        X-RateLimit-Reset:    { $ref: '#/components/headers/X-RateLimit-Reset' }
+        X-Rule-Set-Id:        { $ref: '#/components/headers/X-Rule-Set-Id' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/QuoteResponse' }
+    '401': { $ref: '#/components/responses/Unauthorized' }
+    '403': { $ref: '#/components/responses/Forbidden' }
+    '422': { $ref: '#/components/responses/UnprocessableEntity' }
+    '429': { $ref: '#/components/responses/TooManyRequests' }

@@ -1,0 +1,11 @@
+type: object
+required: [quantity, shipTo]
+properties:
+  quantity: { type: integer, minimum: 1, example: 10 }
+  shipTo:
+    type: object
+    required: [lat, lng]
+    properties:
+      lat: { type: number, example: 40.71 }
+      lng: { type: number, example: -74.0 }
+  clientRef: { type: string, example: 'PO-12345' }

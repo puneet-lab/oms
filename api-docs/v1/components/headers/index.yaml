@@ -1,0 +1,8 @@
+X-Request-Id:           { $ref: './X-Request-Id.yaml' }
+X-RateLimit-Limit:      { $ref: './X-RateLimit-Limit.yaml' }
+X-RateLimit-Remaining:  { $ref: './X-RateLimit-Remaining.yaml' }
+X-RateLimit-Reset:      { $ref: './X-RateLimit-Reset.yaml' }
+X-Rule-Set-Id:          { $ref: './X-Rule-Set-Id.yaml' }
+Idempotency-Key:        { $ref: './Idempotency-Key.yaml' }
+X-Order-Id:             { $ref: './X-Order-Id.yaml' }
+X-Idempotency-Replayed: { $ref: './X-Idempotency-Replayed.yaml' }
