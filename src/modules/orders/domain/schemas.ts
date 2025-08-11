@@ -10,7 +10,7 @@ export const QuoteReason = z.enum(['INSUFFICIENT_STOCK', 'SHIPPING_EXCEEDS_15_PE
 export type QuoteReason = z.infer<typeof QuoteReason>;
 
 export const AllocationItemSchema = z.object({
-  warehouseId: z.string().uuid(),
+  warehouseId: z.uuid(),
   name: z.string(),
   quantity: z.number().int().min(1),
   distanceKm: z.number(),
@@ -19,7 +19,7 @@ export const AllocationItemSchema = z.object({
 export type AllocationItem = z.infer<typeof AllocationItemSchema>;
 
 export const QuoteResponseSchema = z.object({
-  ruleSetId: z.string().uuid(),
+  ruleSetId: z.string(),
   input: CreateQuoteRequestSchema,
   totals: z.object({
     unitPriceCents: z.number().int().min(0),

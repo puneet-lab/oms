@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const WarehouseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   name: z.string(),
   lat: z.number(),
   lng: z.number(),
