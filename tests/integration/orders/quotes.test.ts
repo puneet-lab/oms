@@ -1,7 +1,7 @@
 process.env.NODE_ENV = 'test';
 
 import request from 'supertest';
-import { prisma } from '../../src/common/prisma';
+import { prisma } from '../../../src/common/prisma';
 import type { Express } from 'express';
 
 describe('POST /v1/orders/quotes', () => {
@@ -11,7 +11,7 @@ describe('POST /v1/orders/quotes', () => {
 
   beforeAll(async () => {
     // Import app AFTER setting NODE_ENV (same as working test)
-    const { createApp } = await import('../../src/app');
+    const { createApp } = await import('../../../src/app');
     app = createApp();
 
     // Clean up any existing test data first
@@ -45,7 +45,6 @@ describe('POST /v1/orders/quotes', () => {
 
     // Ensure at least one warehouse
     const existingWarehouse = await prisma.warehouse.findFirst();
-    console.log('🎈 - existingWarehouse:', existingWarehouse);
     if (!existingWarehouse) {
       await prisma.warehouse.create({
         data: { name: 'TEST-W1', lat: 40.7, lng: -74.0, stockUnits: 1000 },

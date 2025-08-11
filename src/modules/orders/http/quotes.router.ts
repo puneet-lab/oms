@@ -5,7 +5,7 @@ import {
   CreateQuoteRequestSchema,
   QuoteResponseSchema,
   type CreateQuoteRequest,
-} from '../domain/schemas';
+} from '../domain/quotes';
 import { QuoteService } from '../app/quote';
 
 const r = Router();
