@@ -4,6 +4,25 @@
 
 It handles smart warehouse allocation, cost-optimized shipping, dynamic volume discounts, strict order validation, and real-time inventory updates — all runnable locally with Docker and deployable to the cloud.
 
+## 🚀 Live Demo
+
+**API Base URL:** `http://a0ae091c583294d3a9c88fff5917fe87-150428700.ap-southeast-1.elb.amazonaws.com:3000`
+
+**Quick Test:**
+
+```bash
+curl http://a0ae091c583294d3a9c88fff5917fe87-150428700.ap-southeast-1.elb.amazonaws.com:3000/api/health
+```
+
+## 📋 API Examples
+
+Ready-to-use curl commands for testing:
+
+- **[Quotes API Examples](./examples/api-quotes.md)** - Get price quotes without creating orders
+- **[Orders API Examples](./examples/api-orders.md)** - Create orders with inventory allocation
+
+Try the examples to see multi-warehouse allocation, volume discounts, and business rule validation in action!
+
 ## Getting Started (Local)
 
 Requires **Docker** and **Docker Compose** — no local Postgres installation needed.
@@ -37,7 +56,9 @@ TEST_DATABASE_URL=postgres://admin:admin@localhost:5432/oms
 
 ## API Overview
 
-Check the **OpenAPI docs** at:
+**Interactive API Documentation:** http://a0ae091c583294d3a9c88fff5917fe87-150428700.ap-southeast-1.elb.amazonaws.com:3000/docs/
+
+Or check the **OpenAPI spec** at:
 
 ```bash
 api-docs/v1/openapi.yaml
