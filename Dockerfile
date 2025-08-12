@@ -9,7 +9,7 @@ RUN npm ci --only=production && \
     npm ci && \
     npm cache clean --force
 
-# Copy prisma and generate
+# Copy prisma and generate client
 COPY prisma ./prisma
 RUN npx prisma generate
 
@@ -18,5 +18,8 @@ COPY tsconfig.json ./
 COPY src ./src
 COPY api-docs ./api-docs
 
+# Run seed after prisma generate
+RUN npm run seed
+
 EXPOSE 3000
-CMD ["sh","-c","npx prisma generate && npm run dev"]
+CMD ["sh", "-c", "npm run seed && npm run dev"]
