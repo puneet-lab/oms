@@ -1,10 +1,7 @@
-// src/modules/orders/app/create.ts
-import type { CreateOrderRequest } from '../domain/order'; // or "../domain/order.schemas" if that's your path
+import type { CreateOrderRequest } from '../domain/order';
 import { CachedRulesProvider } from '../../pricing/app/cache';
 import { allocateNearest } from '../domain/allocation';
-
 import { HttpError } from '../../../common/errors';
-
 import { computeTotals } from '../../pricing/domain/pricing';
 import {
   createOrderWithAllocations,
@@ -16,7 +13,7 @@ export class CreateOrderService {
   constructor(private rules = new CachedRulesProvider()) {}
 
   async execute(req: CreateOrderRequest, idempotencyKey: string, userId?: string) {
-    // 1) Idempotency replay
+    // 1) Idempotency replay (fast path)
     const replay = await findOrderSnapshotByIdempotencyKey(idempotencyKey);
     if (replay) return { replay: true, ...replay };
 
@@ -24,7 +21,7 @@ export class CreateOrderService {
     const ruleSet = await this.rules.getActive(new Date());
     if (!ruleSet) throw new HttpError(503, 'NO_ACTIVE_RULESET', 'No active pricing ruleset');
 
-    // 3) Read warehouses → allocate → compute totals (shared domain helpers)
+    // 3) Allocate + totals
     const warehouses = await loadAllWarehouses();
 
     const allocation = allocateNearest({
@@ -62,7 +59,7 @@ export class CreateOrderService {
       );
     }
 
-    // 4) Persist (transaction inside adapter) & return snapshot
+    // 4) Persist + snapshot (repo handles P2002 internally; may set replay:true)
     const snapshot = await createOrderWithAllocations({
       userId,
       idempotencyKey,
@@ -70,6 +67,7 @@ export class CreateOrderService {
       request: { qty: req.quantity, lat: req.shipTo.lat, lng: req.shipTo.lng },
       totals: {
         unitPriceCents: totals.unitPriceCents,
+        subtotalCents: totals.subtotalCents,
         discountPct: totals.discountPct,
         discountCents: totals.discountCents,
         shippingCents: totals.shippingCents,
@@ -78,6 +76,6 @@ export class CreateOrderService {
       allocation: allocation.items,
     });
 
-    return { replay: false, ...snapshot };
+    return { replay: !!snapshot.replay, ...snapshot };
   }
 }

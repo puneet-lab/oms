@@ -1,4 +1,4 @@
-import type { Warehouse } from './schemas.ts';
+import type { Warehouse } from './schemas';
 
 export interface WarehouseRepository {
   listAll(pagination: {

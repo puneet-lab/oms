@@ -24,16 +24,13 @@ export const CreateOrderResponseSchema = z.object({
     shippingCents: z.number().int().min(0),
     totalCents: z.number().int().min(0),
   }),
-  allocation: z.object({
-    items: z.array(
-      z.object({
-        warehouseId: z.uuid(),
-        name: z.string(),
-        quantity: z.number().int().min(1),
-        distanceKm: z.number(),
-        shippingCents: z.number().int().min(0),
-      }),
-    ),
-  }),
+  allocation: z.array(
+    z.object({
+      warehouseId: z.uuid(),
+      quantity: z.number().int().min(1),
+      distanceKm: z.number(),
+      shippingCents: z.number().int().min(0),
+    }),
+  ),
 });
 export type CreateOrderResponse = z.infer<typeof CreateOrderResponseSchema>;

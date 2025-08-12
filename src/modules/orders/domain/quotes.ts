@@ -11,7 +11,6 @@ export type QuoteReason = z.infer<typeof QuoteReason>;
 
 export const AllocationItemSchema = z.object({
   warehouseId: z.uuid(),
-  name: z.string(),
   quantity: z.number().int().min(1),
   distanceKm: z.number(),
   shippingCents: z.number().int().min(0),

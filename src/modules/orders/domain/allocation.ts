@@ -20,7 +20,6 @@ export type Warehouse = z.infer<typeof WarehouseSchema>;
 
 export const AllocationItemSchema = z.object({
   warehouseId: z.uuid(),
-  name: z.string(),
   quantity: z.number().int().min(1),
   distanceKm: z.number().min(0),
   shippingCents: z.number().int().min(0),
@@ -68,7 +67,6 @@ export function allocateNearest(raw: AllocateInput): AllocateOutput {
 
     items.push({
       warehouseId: w.id,
-      name: w.name,
       quantity: take,
       distanceKm: Math.round(w.distanceKm * 10) / 10,
       shippingCents: cents(shipDollars),
