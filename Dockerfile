@@ -18,8 +18,5 @@ COPY tsconfig.json ./
 COPY src ./src
 COPY api-docs ./api-docs
 
-# Run seed after prisma generate
-RUN npm run seed
-
 EXPOSE 3000
-CMD ["sh", "-c", "npm run seed && npm run dev"]
+CMD ["sh", "-c", "npm run dev"]
