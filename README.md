@@ -11,7 +11,7 @@ It handles smart warehouse allocation, cost-optimized shipping, dynamic volume d
 **Quick Test:**
 
 ```bash
-curl http://a0ae091c583294d3a9c88fff5917fe87-150428700.ap-southeast-1.elb.amazonaws.com:3000/api/health
+curl http://a0ae091c583294d3a9c88fff5917fe87-150428700.ap-southeast-1.elb.amazonaws.com:3000/health
 ```
 
 ## 📋 API Examples
