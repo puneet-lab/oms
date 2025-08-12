@@ -18,7 +18,7 @@ export const AllocationItemSchema = z.object({
 export type AllocationItem = z.infer<typeof AllocationItemSchema>;
 
 export const QuoteResponseSchema = z.object({
-  ruleSetId: z.string(),
+  ruleSetId: z.uuid(),
   input: CreateQuoteRequestSchema,
   totals: z.object({
     unitPriceCents: z.number().int().min(0),

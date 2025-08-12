@@ -39,22 +39,20 @@ post:
           examples:
             created:
               value:
-                orderId: '123e4567-e89b-12d3-a456-426614174000'
+                orderId: '6126ef6f-2387-4f0e-9bcd-bf9130d20f73'
                 ruleSetId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
                 totals:
                   unitPriceCents: 15000
-                  subtotalCents: 150000
+                  subtotalCents: 750000
                   discountPct: 10
-                  discountCents: 15000
-                  shippingCents: 12345
-                  totalCents: 147345
+                  discountCents: 75000
+                  shippingCents: 369
+                  totalCents: 675369
                 allocation:
-                  items:
-                    - warehouseId: 'f9b2a1c3-4d5e-6f7a-8b9c-0d1e2f3a4b5c'
-                      name: 'Los Angeles'
-                      quantity: 10
-                      distanceKm: 3942.6
-                      shippingCents: 12345
+                  - warehouseId: '08d6c070-6212-4f0e-9bcd-bf9130d20f73'
+                    quantity: 50
+                    distanceKm: 20.2
+                    shippingCents: 369
     '200':
       description: Idempotent replay - order already exists
       headers:

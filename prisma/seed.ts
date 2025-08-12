@@ -22,11 +22,13 @@ async function main() {
 
   console.log('Seeded warehouses ✔');
 
+  const ruleSetId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+
   const rs = await prisma.pricingRuleSet.upsert({
-    where: { id: 'seed-default-v1' },
+    where: { id: ruleSetId },
     update: {},
     create: {
-      id: 'seed-default-v1',
+      id: ruleSetId,
       name: 'Default v1',
       effectiveFrom: new Date(Date.now() - 60_000),
       unitPriceCents: 15000,
