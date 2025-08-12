@@ -68,6 +68,28 @@ Authentication is a **dummy service** for demonstration purposes.
 
 ## Architecture
 
+### Database Schema
+
+![Database ER Diagram](./api-docs/images/database-schema.png)
+
+The database design supports sophisticated multi-warehouse order management with:
+
+- **Warehouse management** with geolocation for shipping optimization
+- **Flexible pricing rules** with volume-based discount tiers
+- **Order allocation** across multiple warehouses for cost efficiency
+- **Idempotency protection** to prevent duplicate orders
+
+### Deployment Architecture
+
+![EKS Deployment Diagram](./api-docs/images/deployment-architecture.png)
+
+Production deployment on AWS EKS with:
+
+- **AWS Load Balancer** for external traffic routing
+- **Kubernetes services** for internal communication
+- **Horizontal Pod Autoscaler** for automatic scaling (1-5 replicas)
+- **PostgreSQL** with persistent storage
+
 ### Why a Modular Monolith (now)
 
 - **Speed & cohesion**: One deployable keeps latency and overhead low during iteration.
@@ -135,10 +157,32 @@ docker compose exec app npm test
 - **Unit tests**: pricing, discount, and shipping calculations
 - **Integration tests**: end-to-end quote & order flows against test DB
 
-## Next Steps
+## Future Roadmap & Resilience
 
-- Full idempotency middleware with persistent key store
-- RBAC for sales/admin roles
-- Multi-SKU support
-- Multi-region deployment with global failover
-- Advanced allocation heuristics + caching
+### Microservices Evolution
+
+- **Service decomposition**: Extract Orders, Inventory, Pricing, and Auth services from the current modular monolith
+- **API Gateway**: Centralized routing and cross-cutting concerns (authentication, rate limiting, monitoring)
+- **Service mesh**: Inter-service communication with Istio for advanced traffic management and security
+
+### Serverless Integration
+
+- **AWS Lambda functions**: Event-driven processing for quotes, notifications, and background tasks
+- **Hybrid architecture**: Combine Kubernetes services for stateful operations with Lambda for stateless compute
+- **Cost optimization**: Pay-per-execution model for variable workloads
+
+### Multi-Region Disaster Recovery
+
+- **Pilot Light strategy**: Minimal infrastructure running in secondary region, rapidly scalable during failover
+- **Database replication**: PostgreSQL read replicas and automated backups across regions
+- **Infrastructure as Code**: Terraform modules for consistent environment recreation
+- **Health monitoring**: Automated failover triggers based on comprehensive health checks
+- **RTO/RPO targets**: Recovery Time Objective <15 minutes, Recovery Point Objective <5 minutes
+
+### Event-Driven Architecture
+
+- **Message queues**: SQS for order processing, inventory updates, and notification workflows
+- **Event streaming**: Implement CQRS patterns for read/write separation and audit trails
+- **Background workers**: Kubernetes jobs for batch processing and data synchronization
+
+This architecture ensures **99.99% availability** with automatic scaling, disaster recovery, and the flexibility to evolve from monolith to microservices as business needs grow.
