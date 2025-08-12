@@ -1,0 +1,38 @@
+post:
+  tags: [Admin, Pricing]
+  summary: Create pricing rule set
+  description: |
+    Create a rule set with effective date.
+    If effective now, future verifications use it immediately.
+  operationId: createPricingRuleSet
+  security: [ { bearerAuth: [] } ]
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema: { $ref: '#/components/schemas/CreateRuleSet' }
+        examples:
+          now:
+            value:
+              name: 'Q4-2025'
+              effectiveFrom: '2025-08-10T00:00:00Z'
+              unitPriceCents: 15000
+              unitWeightKg: 0.365
+              shipRatePerKgKm: 0.01
+              shippingMaxRatio: 0.15
+  responses:
+    '201':
+      description: Created
+      headers:
+        X-Request-Id: { $ref: '#/components/headers/X-Request-Id' }
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              id:           { type: string, format: uuid, example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' }
+              effectiveFrom:{ type: string, format: date-time, example: '2025-08-10T00:00:00Z' }
+    '401': { $ref: '#/components/responses/Unauthorized' }
+    '403': { $ref: '#/components/responses/Forbidden' }
+    '422': { $ref: '#/components/responses/UnprocessableEntity' }
+    '429': { $ref: '#/components/responses/TooManyRequests' }

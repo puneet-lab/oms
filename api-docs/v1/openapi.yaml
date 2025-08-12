@@ -1,0 +1,972 @@
+openapi: 3.0.3
+info:
+  title: OMS API
+  version: 1.0.0
+  description: |
+    Versioned Order Management API with dev-friendly docs.
+    Use Swagger "Authorize" to test protected routes. Dev auth format:
+    `Authorization: Bearer dummy.<role>.<userId>` (roles: sales, admin)
+
+servers:
+  - url: /api
+    description: API namespace (most endpoints)
+  - url: /
+    description: Root (also exposes /v1/* and /health)
+
+tags:
+  - name: Meta
+    description: Health & utility
+  - name: Auth
+    description: Authentication (dummy, dev-only)
+  - name: Warehouses
+    description: Inventory locations and stock levels
+  - name: Orders
+    description: Order quoting and management
+  - name: Admin
+    description: Admin-only endpoints
+  - name: Pricing
+    description: Pricing rule management
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT # dummy today; real token later
+
+  headers:
+    X-Request-Id:
+      description: Correlates server logs with this response.
+      schema:
+        type: string
+    X-RateLimit-Limit:
+      description: Max requests allowed in the current window.
+      schema:
+        type: integer
+        example: 100
+    X-RateLimit-Remaining:
+      description: Requests left in the current window.
+      schema:
+        type: integer
+        example: 97
+    X-RateLimit-Reset:
+      description: Unix epoch seconds when the window resets.
+      schema:
+        type: integer
+        format: int64
+        example: 1723199999
+    X-Rule-Set-Id:
+      description: Pricing ruleset used to compute the quote.
+      schema:
+        type: string
+        format: uuid
+    Idempotency-Key:
+      description: Prevents duplicate order creation; required.
+      schema:
+        type: string
+    X-Order-Id:
+      description: Created order id.
+      schema:
+        type: string
+        format: uuid
+    X-Idempotency-Replayed:
+      description: Present on replayed requests.
+      schema:
+        type: string
+        enum: ['true']
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: UNAUTHORIZED
+            message:
+              type: string
+              example: Missing or invalid token
+
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: Invalid request
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                    example: 'limit'
+                  code:
+                    type: string
+                    example: 'invalid_type'
+                  message:
+                    type: string
+                    example: 'Expected number, received string'
+
+    User:
+      type: object
+      required: [id, role]
+      properties:
+        id:
+          type: string
+          example: dev-user-123
+        role:
+          type: string
+          enum: [sales, admin]
+          example: sales
+
+    Warehouse:
+      type: object
+      required: [id, name, lat, lng, stockUnits]
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: '2d5e7e32-bcdb-4a2f-8a5e-2b2a9b4d6c71'
+        name:
+          type: string
+          example: 'Los Angeles'
+        lat:
+          type: number
+          example: 33.9425
+        lng:
+          type: number
+          example: -118.408056
+        stockUnits:
+          type: integer
+          minimum: 0
+          example: 355
+
+    CreateRuleSet:
+      type: object
+      required:
+        [name, effectiveFrom, unitPriceCents, unitWeightKg, shipRatePerKgKm, shippingMaxRatio]
+      properties:
+        name:
+          type: string
+          example: 'Q4-2025'
+        effectiveFrom:
+          type: string
+          format: date-time
+          example: '2025-08-10T00:00:00Z'
+        unitPriceCents:
+          type: integer
+          minimum: 0
+          example: 15000
+        unitWeightKg:
+          type: number
+          exclusiveMinimum: 0
+          example: 0.365
+        shipRatePerKgKm:
+          type: number
+          minimum: 0
+          example: 0.01
+        shippingMaxRatio:
+          type: number
+          minimum: 0
+          maximum: 1
+          example: 0.15
+
+    DiscountTier:
+      type: object
+      required: [threshold, pct]
+      properties:
+        threshold:
+          type: integer
+          minimum: 1
+          example: 25
+        pct:
+          type: integer
+          minimum: 0
+          maximum: 100
+          example: 5
+        priority:
+          type: integer
+          minimum: 0
+          example: 0
+
+    CreateQuoteRequest:
+      type: object
+      required: [quantity, shipTo]
+      properties:
+        quantity:
+          type: integer
+          minimum: 1
+          example: 42
+        shipTo:
+          type: object
+          required: [lat, lng]
+          properties:
+            lat:
+              type: number
+              example: 40.71
+            lng:
+              type: number
+              example: -74.0
+
+    CreateOrderRequest:
+      type: object
+      required: [quantity, shipTo]
+      properties:
+        quantity:
+          type: integer
+          minimum: 1
+          example: 10
+        shipTo:
+          type: object
+          required: [lat, lng]
+          properties:
+            lat:
+              type: number
+              example: 40.71
+            lng:
+              type: number
+              example: -74.0
+        clientRef:
+          type: string
+          example: 'PO-12345'
+
+    CreateOrderResponse:
+      type: object
+      required: [orderId, ruleSetId, totals, allocation]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        ruleSetId:
+          type: string
+          format: uuid
+        totals:
+          type: object
+          required:
+            [unitPriceCents, subtotalCents, discountPct, discountCents, shippingCents, totalCents]
+          properties:
+            unitPriceCents:
+              type: integer
+              example: 15000
+            subtotalCents:
+              type: integer
+              example: 150000
+            discountPct:
+              type: integer
+              example: 10
+            discountCents:
+              type: integer
+              example: 15000
+            shippingCents:
+              type: integer
+              example: 12345
+            totalCents:
+              type: integer
+              example: 147345
+        allocation:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                required: [warehouseId, name, quantity, distanceKm, shippingCents]
+                properties:
+                  warehouseId:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+                  quantity:
+                    type: integer
+                  distanceKm:
+                    type: number
+                  shippingCents:
+                    type: integer
+
+    AllocationItem:
+      type: object
+      required: [warehouseId, name, quantity, distanceKm, shippingCents]
+      properties:
+        warehouseId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        distanceKm:
+          type: number
+          example: 3942.6
+        shippingCents:
+          type: integer
+          minimum: 0
+
+    QuoteResponse:
+      type: object
+      required: [ruleSetId, input, totals, allocation]
+      properties:
+        ruleSetId:
+          type: string
+          format: uuid
+        input:
+          $ref: '#/components/schemas/CreateQuoteRequest'
+        totals:
+          type: object
+          required:
+            [
+              unitPriceCents,
+              subtotalCents,
+              discountPct,
+              discountCents,
+              shippingCents,
+              totalCents,
+              shippingRatio,
+              valid,
+            ]
+          properties:
+            unitPriceCents:
+              type: integer
+              example: 15000
+            subtotalCents:
+              type: integer
+              example: 630000
+            discountPct:
+              type: integer
+              example: 10
+            discountCents:
+              type: integer
+              example: 63000
+            shippingCents:
+              type: integer
+              example: 12345
+            totalCents:
+              type: integer
+              example: 579345
+            shippingRatio:
+              type: number
+              example: 0.0213
+            valid:
+              type: boolean
+              example: true
+            reason:
+              type: string
+              enum: [INSUFFICIENT_STOCK, SHIPPING_EXCEEDS_15_PERCENT]
+        allocation:
+          type: object
+          required: [items, unallocated]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/AllocationItem'
+            unallocated:
+              type: integer
+              example: 0
+
+  responses:
+    UnprocessableEntity:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+
+    Unauthorized:
+      description: Unauthorized
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            unauthorized:
+              value:
+                error:
+                  code: UNAUTHORIZED
+                  message: 'Missing or invalid token'
+
+    Forbidden:
+      description: Forbidden
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            forbidden:
+              value:
+                error:
+                  code: FORBIDDEN
+                  message: 'Insufficient role'
+
+    TooManyRequests:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            limited:
+              value:
+                error:
+                  code: RATE_LIMITED
+                  message: 'Too many requests'
+
+    NotFound:
+      description: Resource not found
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            notFound:
+              value:
+                error:
+                  code: NOT_FOUND
+                  message: 'Resource not found'
+
+paths:
+  /health:
+    get:
+      tags: [Meta]
+      summary: Liveness probe
+      operationId: getHealth
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+
+  /v1/ping:
+    get:
+      tags: [Meta]
+      summary: Quick sanity check
+      operationId: getPing
+      responses:
+        '200':
+          description: Pong
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pong:
+                    type: boolean
+                    example: true
+
+  /v1/auth:
+    get:
+      tags: [Auth]
+      summary: Usage help for dummy auth
+      description: |
+        Click **Authorize** and paste an example like:
+        `Bearer dummy.sales.dev-user-123`
+      operationId: getAuthUsage
+      responses:
+        '200':
+          description: Usage + roles
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  usage:
+                    type: string
+                    example: 'Authorization: Bearer dummy.<role>.<userId>'
+                  roles:
+                    type: array
+                    items:
+                      type: string
+                      enum: [sales, admin]
+                    example: [sales, admin]
+
+  /v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: Return current user (dummy)
+      description: |
+        **How to test:** Click **Authorize** → paste:
+        `Bearer dummy.sales.dev-user-123` (or `dummy.admin.corp-1`)
+      operationId: getAuthMe
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+              examples:
+                salesUser:
+                  value:
+                    user:
+                      id: 'dev-user-123'
+                      role: 'sales'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /v1/warehouses:
+    get:
+      tags: [Warehouses]
+      summary: List warehouses (read-only)
+      description: |
+        Returns the current stock per warehouse. Public endpoint (no auth).
+      operationId: listWarehouses
+      parameters:
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          example: 1
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+          example: 10
+      responses:
+        '200':
+          description: OK
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Warehouse'
+                  pagination:
+                    type: object
+                    properties:
+                      page:
+                        type: integer
+                        example: 1
+                      limit:
+                        type: integer
+                        example: 10
+                      total:
+                        type: integer
+                        example: 6
+                      totalPages:
+                        type: integer
+                        example: 1
+                      hasNext:
+                        type: boolean
+                        example: false
+                      hasPrevious:
+                        type: boolean
+                        example: false
+              examples:
+                sample:
+                  value:
+                    data:
+                      - id: 'f9b2a1c3-4d5e-6f7a-8b9c-0d1e2f3a4b5c'
+                        name: 'Los Angeles'
+                        lat: 33.9425
+                        lng: -118.408056
+                        stockUnits: 355
+                      - id: 'a1c3b2d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d'
+                        name: 'New York'
+                        lat: 40.639722
+                        lng: -73.778889
+                        stockUnits: 578
+                    pagination:
+                      page: 1
+                      limit: 10
+                      total: 6
+                      totalPages: 1
+                      hasNext: false
+                      hasPrevious: false
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /v1/orders/quotes:
+    post:
+      tags: [Orders]
+      summary: Price & allocate an order (no inventory change)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQuoteRequest'
+            examples:
+              sample:
+                value:
+                  quantity: 42
+                  shipTo:
+                    lat: 40.71
+                    lng: -74.0
+      responses:
+        '200':
+          description: Quote computed
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+            X-Rule-Set-Id:
+              $ref: '#/components/headers/X-Rule-Set-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuoteResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /v1/orders:
+    post:
+      tags: [Orders]
+      summary: Create an order (transactional). Decrements stock on success.
+      description: |
+        Creates a new order with inventory allocation. Requires idempotency key
+        to prevent duplicate orders. Returns 201 on creation, 200 on replay.
+      operationId: createOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+          example: 'order-2025-abc123'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+            examples:
+              sample:
+                value:
+                  quantity: 10
+                  shipTo:
+                    lat: 40.71
+                    lng: -74.0
+                  clientRef: 'PO-12345'
+      responses:
+        '201':
+          description: Order created successfully
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            X-Order-Id:
+              $ref: '#/components/headers/X-Order-Id'
+            X-Rule-Set-Id:
+              $ref: '#/components/headers/X-Rule-Set-Id'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateOrderResponse'
+              examples:
+                created:
+                  value:
+                    orderId: '123e4567-e89b-12d3-a456-426614174000'
+                    ruleSetId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+                    totals:
+                      unitPriceCents: 15000
+                      subtotalCents: 150000
+                      discountPct: 10
+                      discountCents: 15000
+                      shippingCents: 12345
+                      totalCents: 147345
+                    allocation:
+                      items:
+                        - warehouseId: 'f9b2a1c3-4d5e-6f7a-8b9c-0d1e2f3a4b5c'
+                          name: 'Los Angeles'
+                          quantity: 10
+                          distanceKm: 3942.6
+                          shippingCents: 12345
+        '200':
+          description: Idempotent replay - order already exists
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            X-Order-Id:
+              $ref: '#/components/headers/X-Order-Id'
+            X-Rule-Set-Id:
+              $ref: '#/components/headers/X-Rule-Set-Id'
+            X-Idempotency-Replayed:
+              $ref: '#/components/headers/X-Idempotency-Replayed'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateOrderResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict - insufficient stock or shipping ratio exceeded
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                insufficientStock:
+                  value:
+                    error:
+                      code: INSUFFICIENT_STOCK
+                      message: 'Only 5 units available, requested 10'
+                shippingExceeded:
+                  value:
+                    error:
+                      code: SHIPPING_EXCEEDS_LIMIT
+                      message: 'Shipping cost exceeds 15% of order value'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          description: Service unavailable - pricing not configured
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                noPricing:
+                  value:
+                    error:
+                      code: PRICING_NOT_CONFIGURED
+                      message: 'No active pricing ruleset found'
+
+  /v1/admin/pricing/rulesets:
+    post:
+      tags: [Admin, Pricing]
+      summary: Create pricing rule set
+      description: |
+        Create a rule set with effective date. If effective now, future verifications use it immediately.
+      operationId: createPricingRuleSet
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRuleSet'
+            examples:
+              now:
+                value:
+                  name: 'Q4-2025'
+                  effectiveFrom: '2025-08-10T00:00:00Z'
+                  unitPriceCents: 15000
+                  unitWeightKg: 0.365
+                  shipRatePerKgKm: 0.01
+                  shippingMaxRatio: 0.15
+      responses:
+        '201':
+          description: Created
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+                  effectiveFrom:
+                    type: string
+                    format: date-time
+                    example: '2025-08-10T00:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /v1/admin/pricing/rulesets/{id}/tiers:
+    put:
+      tags: [Admin, Pricing]
+      summary: Replace discount tiers for a rule set
+      description: |
+        Replace all discount tiers for the specified rule set with the provided tiers.
+      operationId: replacePricingTiers
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tiers]
+              properties:
+                tiers:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/DiscountTier'
+            examples:
+              basic:
+                value:
+                  tiers:
+                    - threshold: 25
+                      pct: 5
+                    - threshold: 50
+                      pct: 10
+                    - threshold: 100
+                      pct: 15
+                    - threshold: 250
+                      pct: 20
+      responses:
+        '200':
+          description: Replaced
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ruleSetId:
+                    type: string
+                    format: uuid
+                    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+                  tiers:
+                    type: integer
+                    example: 4
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'

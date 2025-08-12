@@ -1,0 +1,52 @@
+put:
+  tags: [Admin, Pricing]
+  summary: Replace discount tiers for a rule set
+  description: Replace all discount tiers for the specified rule set with the provided tiers.
+  operationId: replacePricingTiers
+  security: [ { bearerAuth: [] } ]
+  parameters:
+    - in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
+      example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [tiers]
+          properties:
+            tiers:
+              type: array
+              items: { $ref: '#/components/schemas/DiscountTier' }
+        examples:
+          basic:
+            value:
+              tiers:
+                - threshold: 25
+                  pct: 5
+                - threshold: 50
+                  pct: 10
+                - threshold: 100
+                  pct: 15
+                - threshold: 250
+                  pct: 20
+  responses:
+    '200':
+      description: Replaced
+      headers:
+        X-Request-Id: { $ref: '#/components/headers/X-Request-Id' }
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ruleSetId: { type: string, format: uuid, example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' }
+              tiers:     { type: integer, example: 4 }
+    '401': { $ref: '#/components/responses/Unauthorized' }
+    '403': { $ref: '#/components/responses/Forbidden' }
+    '404': { $ref: '#/components/responses/NotFound' }
+    '422': { $ref: '#/components/responses/UnprocessableEntity' }
+    '429': { $ref: '#/components/responses/TooManyRequests' }

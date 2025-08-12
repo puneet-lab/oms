@@ -1,0 +1,28 @@
+type: object
+required: [ruleSetId, input, totals, allocation]
+properties:
+  ruleSetId: { type: string, format: uuid }
+  input:     { $ref: '#/components/schemas/CreateQuoteRequest' }
+  totals:
+    type: object
+    required: [unitPriceCents, subtotalCents, discountPct, discountCents, shippingCents, totalCents, shippingRatio, valid]
+    properties:
+      unitPriceCents: { type: integer, example: 15000 }
+      subtotalCents:  { type: integer, example: 630000 }
+      discountPct:    { type: integer, example: 10 }
+      discountCents:  { type: integer, example: 63000 }
+      shippingCents:  { type: integer, example: 12345 }
+      totalCents:     { type: integer, example: 579345 }
+      shippingRatio:  { type: number,  example: 0.0213 }
+      valid:          { type: boolean, example: true }
+      reason:
+        type: string
+        enum: [INSUFFICIENT_STOCK, SHIPPING_EXCEEDS_15_PERCENT]
+  allocation:
+    type: object
+    required: [items, unallocated]
+    properties:
+      items:
+        type: array
+        items: { $ref: '#/components/schemas/AllocationItem' }
+      unallocated: { type: integer, example: 0 }

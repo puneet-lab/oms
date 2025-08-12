@@ -1,0 +1,18 @@
+get:
+  tags: [Meta]
+  summary: Quick sanity check
+  operationId: getPing
+  responses:
+    '200':
+      description: Pong
+      headers:
+        X-Request-Id:         { $ref: '#/components/headers/X-Request-Id' }
+        X-RateLimit-Limit:    { $ref: '#/components/headers/X-RateLimit-Limit' }
+        X-RateLimit-Remaining:{ $ref: '#/components/headers/X-RateLimit-Remaining' }
+        X-RateLimit-Reset:    { $ref: '#/components/headers/X-RateLimit-Reset' }
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              pong: { type: boolean, example: true }

@@ -1,0 +1,6 @@
+type: object
+required: [threshold, pct]
+properties:
+  threshold: { type: integer, minimum: 1,   example: 25 }
+  pct:       { type: integer, minimum: 0,   maximum: 100, example: 5 }
+  priority:  { type: integer, minimum: 0,   example: 0 }

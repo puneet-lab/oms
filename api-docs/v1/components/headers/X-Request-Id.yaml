@@ -1,0 +1,2 @@
+description: Correlates server logs with this response.
+schema: { type: string }

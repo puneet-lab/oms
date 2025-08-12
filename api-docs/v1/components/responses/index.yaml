@@ -1,0 +1,5 @@
+UnprocessableEntity:  { $ref: './UnprocessableEntity.yaml' }
+Unauthorized:         { $ref: './Unauthorized.yaml' }
+Forbidden:            { $ref: './Forbidden.yaml' }
+TooManyRequests:      { $ref: './TooManyRequests.yaml' }
+NotFound:             { $ref: './NotFound.yaml' }

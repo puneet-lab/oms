@@ -1,0 +1,43 @@
+get:
+  tags: [Warehouses]
+  summary: List warehouses (read-only)
+  description: Returns the current stock per warehouse. Public endpoint (no auth).
+  operationId: listWarehouses
+  parameters:
+    - in: query
+      name: page
+      required: false
+      schema: { type: integer, minimum: 1, default: 1 }
+      example: 1
+    - in: query
+      name: limit
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      example: 10
+  responses:
+    '200':
+      description: OK
+      headers:
+        X-Request-Id:         { $ref: '#/components/headers/X-Request-Id' }
+        X-RateLimit-Limit:    { $ref: '#/components/headers/X-RateLimit-Limit' }
+        X-RateLimit-Remaining:{ $ref: '#/components/headers/X-RateLimit-Remaining' }
+        X-RateLimit-Reset:    { $ref: '#/components/headers/X-RateLimit-Reset' }
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items: { $ref: '#/components/schemas/Warehouse' }
+              pagination:
+                type: object
+                properties:
+                  page:        { type: integer, example: 1 }
+                  limit:       { type: integer, example: 10 }
+                  total:       { type: integer, example: 6 }
+                  totalPages:  { type: integer, example: 1 }
+                  hasNext:     { type: boolean, example: false }
+                  hasPrevious: { type: boolean, example: false }
+    '422': { $ref: '#/components/responses/UnprocessableEntity' }
+    '429': { $ref: '#/components/responses/TooManyRequests' }

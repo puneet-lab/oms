@@ -7,7 +7,102 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Test {
-  id    Int     @id @default(autoincrement())
-  name  String
+model Warehouse {
+  id          String            @id @default(uuid())
+  name        String            @unique
+  lat         Float
+  lng         Float
+  stockUnits  Int               // current available units
+  allocations OrderAllocation[]
+
+  @@index([name])
 }
+
+model IdempotencyKey {
+  // We keep a single key per (method,path) to replay the same response
+  key       String   // client-provided value from "Idempotency-Key"
+  method    String
+  path      String
+  orderId   String?  @unique
+  createdAt DateTime @default(now())
+
+  @@id([key, method, path])           // composite PK is common for idempotency
+  @@index([createdAt])
+}
+
+model PricingRuleSet {
+  id               String   @id @default(uuid())
+  name             String
+  effectiveFrom    DateTime
+  unitPriceCents   Int
+  unitWeightKg     Float
+  shipRatePerKgKm  Float
+  shippingMaxRatio Float
+  createdByUserId  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  tiers            DiscountTier[]
+
+  @@index([effectiveFrom])
+}
+
+model DiscountTier {
+  id        String @id @default(uuid())
+  ruleSetId String
+  threshold Int
+  pct       Int
+  priority  Int     // higher first
+  ruleSet   PricingRuleSet @relation(fields: [ruleSetId], references: [id], onDelete: Cascade)
+
+  @@index([ruleSetId])
+  @@unique([ruleSetId, threshold])
+}
+
+enum OrderStatus {
+  CREATED
+  SHIPPED
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+model Order {
+  id               String        @id @default(uuid())
+  createdAt        DateTime      @default(now())
+  createdByUserId  String?
+  status           OrderStatus   @default(CREATED)
+
+  // request
+  quantity         Int
+  shipToLat        Float
+  shipToLng        Float
+
+  // pricing snapshot
+  ruleSetId        String
+  unitPriceCents   Int
+  discountPct      Int
+  discountCents    Int
+  shippingCents    Int
+  totalCents       Int
+
+  idempotencyKey   String        @unique
+  allocations      OrderAllocation[]
+ 
+  @@index([createdAt])
+}
+
+model OrderAllocation {
+  id            String @id @default(uuid())
+  orderId       String
+  warehouseId   String
+  quantity      Int
+  distanceKm    Float
+  shippingCents Int
+
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  warehouse     Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([warehouseId])
+}
+

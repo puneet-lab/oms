@@ -1,0 +1,11 @@
+ErrorResponse:         { $ref: './ErrorResponse.yaml' }
+ValidationError:       { $ref: './ValidationError.yaml' }
+User:                  { $ref: './User.yaml' }
+Warehouse:             { $ref: './Warehouse.yaml' }
+CreateRuleSet:         { $ref: './CreateRuleSet.yaml' }
+DiscountTier:          { $ref: './DiscountTier.yaml' }
+CreateQuoteRequest:    { $ref: './CreateQuoteRequest.yaml' }
+CreateOrderRequest:    { $ref: './CreateOrderRequest.yaml' }
+CreateOrderResponse:   { $ref: './CreateOrderResponse.yaml' }
+AllocationItem:        { $ref: './AllocationItem.yaml' }
+QuoteResponse:         { $ref: './QuoteResponse.yaml' }

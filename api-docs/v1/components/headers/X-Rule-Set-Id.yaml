@@ -1,0 +1,2 @@
+description: Pricing ruleset used to compute the quote.
+schema: { type: string, format: uuid }

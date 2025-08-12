@@ -1,0 +1,2 @@
+description: Created order id.
+schema: { type: string, format: uuid }

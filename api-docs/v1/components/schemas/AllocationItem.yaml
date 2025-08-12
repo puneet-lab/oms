@@ -1,0 +1,8 @@
+type: object
+required: [warehouseId, name, quantity, distanceKm, shippingCents]
+properties:
+  warehouseId:  { type: string, format: uuid }
+  name:         { type: string }
+  quantity:     { type: integer, minimum: 1 }
+  distanceKm:   { type: number, example: 3942.6 }
+  shippingCents:{ type: integer, minimum: 0 }

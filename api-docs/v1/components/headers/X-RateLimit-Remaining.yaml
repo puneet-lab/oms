@@ -1,0 +1,2 @@
+description: Requests left in the current window.
+schema: { type: integer, example: 97 }

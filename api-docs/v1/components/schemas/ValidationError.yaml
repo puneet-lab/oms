@@ -1,0 +1,15 @@
+type: object
+properties:
+  error:
+    type: object
+    properties:
+      code: { type: string, example: VALIDATION_ERROR }
+      message: { type: string, example: Invalid request }
+      details:
+        type: array
+        items:
+          type: object
+          properties:
+            field:   { type: string, example: 'limit' }
+            code:    { type: string, example: 'invalid_type' }
+            message: { type: string, example: 'Expected number, received string' }
